@@ -1,0 +1,812 @@
+openapi: 3.0.3
+info:
+  title: NBA Game Predictions API
+  description: |
+    API for the NBA Game Predictions Tracker application.
+    Allows users to view games, make predictions, and track accuracy.
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@example.com
+
+servers:
+  - url: http://localhost:8000
+    description: Development server
+  - url: https://api.nba-predictions.example.com
+    description: Production server
+
+tags:
+  - name: games
+    description: NBA game operations
+  - name: predictions
+    description: User prediction operations
+  - name: users
+    description: User management operations
+  - name: leaderboard
+    description: Leaderboard and statistics
+
+paths:
+  /api/health:
+    get:
+      summary: Health check
+      description: Returns the health status of the API
+      operationId: healthCheck
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/users:
+    post:
+      tags:
+        - users
+      summary: Create a new user
+      description: Register a new user account
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Username already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/users/{user_id}:
+    get:
+      tags:
+        - users
+      summary: Get user by ID
+      description: Retrieve a user's profile and statistics
+      operationId: getUser
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: User found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserWithStats'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/games:
+    get:
+      tags:
+        - games
+      summary: List games
+      description: Get a list of NBA games with optional filtering
+      operationId: listGames
+      parameters:
+        - name: status
+          in: query
+          description: Filter by game status
+          schema:
+            type: string
+            enum: [upcoming, in_progress, completed]
+        - name: date_from
+          in: query
+          description: Filter games from this date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          description: Filter games up to this date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: limit
+          in: query
+          description: Maximum number of games to return
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: offset
+          in: query
+          description: Number of games to skip
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of games
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GameList'
+
+    post:
+      tags:
+        - games
+      summary: Create a new game
+      description: Add a new NBA game to the system (admin only)
+      operationId: createGame
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GameCreate'
+      responses:
+        '201':
+          description: Game created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Game'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/games/{game_id}:
+    get:
+      tags:
+        - games
+      summary: Get game by ID
+      description: Retrieve details of a specific game
+      operationId: getGame
+      parameters:
+        - name: game_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Game found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GameWithPredictions'
+        '404':
+          description: Game not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      tags:
+        - games
+      summary: Update game
+      description: Update game details or final score (admin only)
+      operationId: updateGame
+      parameters:
+        - name: game_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GameUpdate'
+      responses:
+        '200':
+          description: Game updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Game'
+        '404':
+          description: Game not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/predictions:
+    get:
+      tags:
+        - predictions
+      summary: List predictions
+      description: Get predictions with optional filtering
+      operationId: listPredictions
+      parameters:
+        - name: user_id
+          in: query
+          description: Filter by user ID
+          schema:
+            type: integer
+        - name: game_id
+          in: query
+          description: Filter by game ID
+          schema:
+            type: integer
+        - name: is_correct
+          in: query
+          description: Filter by correctness (only applies to completed games)
+          schema:
+            type: boolean
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of predictions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PredictionList'
+
+    post:
+      tags:
+        - predictions
+      summary: Create a prediction
+      description: Submit a prediction for an upcoming game
+      operationId: createPrediction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PredictionCreate'
+      responses:
+        '201':
+          description: Prediction created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Prediction'
+        '400':
+          description: Invalid input or game already started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: User already predicted this game
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/predictions/{prediction_id}:
+    get:
+      tags:
+        - predictions
+      summary: Get prediction by ID
+      description: Retrieve a specific prediction
+      operationId: getPrediction
+      parameters:
+        - name: prediction_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Prediction found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Prediction'
+        '404':
+          description: Prediction not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      tags:
+        - predictions
+      summary: Update prediction
+      description: Update a prediction (only before game starts)
+      operationId: updatePrediction
+      parameters:
+        - name: prediction_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PredictionUpdate'
+      responses:
+        '200':
+          description: Prediction updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Prediction'
+        '400':
+          description: Cannot update after game started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Prediction not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      tags:
+        - predictions
+      summary: Delete prediction
+      description: Delete a prediction (only before game starts)
+      operationId: deletePrediction
+      parameters:
+        - name: prediction_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Prediction deleted successfully
+        '400':
+          description: Cannot delete after game started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Prediction not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/leaderboard:
+    get:
+      tags:
+        - leaderboard
+      summary: Get leaderboard
+      description: Get the prediction accuracy leaderboard
+      operationId: getLeaderboard
+      parameters:
+        - name: period
+          in: query
+          description: Time period for leaderboard
+          schema:
+            type: string
+            enum: [all_time, season, month, week]
+            default: all_time
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 100
+      responses:
+        '200':
+          description: Leaderboard data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Leaderboard'
+
+  /api/users/{user_id}/stats:
+    get:
+      tags:
+        - users
+      summary: Get user statistics
+      description: Get detailed prediction statistics for a user
+      operationId: getUserStats
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: User statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserStats'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - timestamp
+      properties:
+        status:
+          type: string
+          example: healthy
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+          example: 1.0.0
+
+    Error:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          type: string
+          example: Resource not found
+
+    UserCreate:
+      type: object
+      required:
+        - username
+        - email
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 50
+          example: hoops_fan_23
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        display_name:
+          type: string
+          maxLength: 100
+          example: Basketball Fan
+
+    User:
+      type: object
+      required:
+        - id
+        - username
+        - email
+        - created_at
+      properties:
+        id:
+          type: integer
+          example: 1
+        username:
+          type: string
+          example: hoops_fan_23
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        display_name:
+          type: string
+          example: Basketball Fan
+        created_at:
+          type: string
+          format: date-time
+
+    UserWithStats:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          properties:
+            total_predictions:
+              type: integer
+              example: 42
+            correct_predictions:
+              type: integer
+              example: 28
+            accuracy_percentage:
+              type: number
+              format: float
+              example: 66.67
+
+    UserStats:
+      type: object
+      required:
+        - user_id
+        - total_predictions
+        - correct_predictions
+        - accuracy_percentage
+      properties:
+        user_id:
+          type: integer
+        total_predictions:
+          type: integer
+        correct_predictions:
+          type: integer
+        accuracy_percentage:
+          type: number
+          format: float
+        predictions_by_team:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamAccuracy'
+        recent_form:
+          type: array
+          description: Last 10 predictions
+          items:
+            type: boolean
+        streak:
+          type: object
+          properties:
+            type:
+              type: string
+              enum: [winning, losing, none]
+            count:
+              type: integer
+
+    TeamAccuracy:
+      type: object
+      properties:
+        team:
+          type: string
+          example: Lakers
+        predictions:
+          type: integer
+        correct:
+          type: integer
+        accuracy:
+          type: number
+          format: float
+
+    GameCreate:
+      type: object
+      required:
+        - home_team
+        - away_team
+        - scheduled_at
+      properties:
+        home_team:
+          type: string
+          example: Lakers
+        away_team:
+          type: string
+          example: Celtics
+        scheduled_at:
+          type: string
+          format: date-time
+        venue:
+          type: string
+          example: Crypto.com Arena
+
+    GameUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [upcoming, in_progress, completed]
+        home_score:
+          type: integer
+          minimum: 0
+        away_score:
+          type: integer
+          minimum: 0
+        scheduled_at:
+          type: string
+          format: date-time
+
+    Game:
+      type: object
+      required:
+        - id
+        - home_team
+        - away_team
+        - scheduled_at
+        - status
+        - created_at
+      properties:
+        id:
+          type: integer
+        home_team:
+          type: string
+          example: Lakers
+        away_team:
+          type: string
+          example: Celtics
+        scheduled_at:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [upcoming, in_progress, completed]
+        home_score:
+          type: integer
+          nullable: true
+        away_score:
+          type: integer
+          nullable: true
+        venue:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    GameWithPredictions:
+      allOf:
+        - $ref: '#/components/schemas/Game'
+        - type: object
+          properties:
+            prediction_count:
+              type: integer
+            home_pick_percentage:
+              type: number
+              format: float
+            away_pick_percentage:
+              type: number
+              format: float
+
+    GameList:
+      type: object
+      required:
+        - games
+        - total
+      properties:
+        games:
+          type: array
+          items:
+            $ref: '#/components/schemas/Game'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    PredictionCreate:
+      type: object
+      required:
+        - user_id
+        - game_id
+        - predicted_winner
+      properties:
+        user_id:
+          type: integer
+        game_id:
+          type: integer
+        predicted_winner:
+          type: string
+          description: Team name of predicted winner
+          example: Lakers
+        predicted_spread:
+          type: integer
+          description: Predicted point difference (positive = winner wins by this many)
+          example: 7
+
+    PredictionUpdate:
+      type: object
+      properties:
+        predicted_winner:
+          type: string
+        predicted_spread:
+          type: integer
+
+    Prediction:
+      type: object
+      required:
+        - id
+        - user_id
+        - game_id
+        - predicted_winner
+        - created_at
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        game_id:
+          type: integer
+        predicted_winner:
+          type: string
+        predicted_spread:
+          type: integer
+          nullable: true
+        is_correct:
+          type: boolean
+          nullable: true
+          description: null if game not completed
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        game:
+          $ref: '#/components/schemas/Game'
+
+    PredictionList:
+      type: object
+      required:
+        - predictions
+        - total
+      properties:
+        predictions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Prediction'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    LeaderboardEntry:
+      type: object
+      required:
+        - rank
+        - user
+        - total_predictions
+        - correct_predictions
+        - accuracy_percentage
+      properties:
+        rank:
+          type: integer
+        user:
+          $ref: '#/components/schemas/User'
+        total_predictions:
+          type: integer
+        correct_predictions:
+          type: integer
+        accuracy_percentage:
+          type: number
+          format: float
+
+    Leaderboard:
+      type: object
+      required:
+        - entries
+        - period
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/LeaderboardEntry'
+        period:
+          type: string
+          enum: [all_time, season, month, week]
+        updated_at:
+          type: string
+          format: date-time
