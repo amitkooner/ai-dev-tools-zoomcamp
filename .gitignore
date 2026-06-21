@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.ipynb_checkpoints/
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Data / models (uncomment if large artifacts shouldn't be tracked)
+# *.joblib
+# *.csv
+# *.xls
+# *.xlsx
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
